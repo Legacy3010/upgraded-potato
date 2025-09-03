@@ -2,8 +2,8 @@
 /**
  * Plugin Name:       WP-YouFlix
  * Plugin URI:        https://example.com/plugins/the-basics/
- * Description:       Display a YouTube channel with a Netflix-style interface.
- * Version:           1.0.0
+ * Description:       A manual video gallery manager with a Netflix-style interface.
+ * Version:           2.0.0
  * Requires at least: 5.2
  * Requires PHP:      7.2
  * Author:            Jules
@@ -19,11 +19,16 @@ if ( ! defined( 'WPINC' ) ) {
     die;
 }
 
-define( 'WP_YOUFLIX_VERSION', '1.0.0' );
+define( 'WP_YOUFLIX_VERSION', '2.0.0' );
 
-// Include the admin menu and settings page
+// Include admin functionality
 require_once plugin_dir_path( __FILE__ ) . 'admin/wp-youflix-admin.php';
 
-// Include the public-facing functionality
+// Include public-facing functionality
 require_once plugin_dir_path( __FILE__ ) . 'public/wp-youflix-public.php';
+
+// Include custom post types, taxonomies, and meta boxes
+require_once plugin_dir_path( __FILE__ ) . 'includes/post-types.php';
+require_once plugin_dir_path( __FILE__ ) . 'includes/meta-boxes.php';
+
 ?>
