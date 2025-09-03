@@ -1,5 +1,6 @@
 // WP-YouFlix Netflix Interactivity
 jQuery(document).ready(function($) {
+    // Carousel Logic
     function updateCarouselButtons(carousel) {
         var scrollLeft = carousel.scrollLeft();
         var scrollWidth = carousel.get(0).scrollWidth;
@@ -7,13 +8,13 @@ jQuery(document).ready(function($) {
         var prevButton = carousel.siblings('.wp-youflix-carousel-prev');
         var nextButton = carousel.siblings('.wp-youflix-carousel-next');
 
-        if (scrollLeft === 0) {
+        if (scrollLeft < 1) {
             prevButton.hide();
         } else {
             prevButton.show();
         }
 
-        if (scrollLeft + width >= scrollWidth - 10) { // -10 for tolerance
+        if (scrollLeft + width >= scrollWidth - 1) {
             nextButton.hide();
         } else {
             nextButton.show();
@@ -49,4 +50,41 @@ jQuery(document).ready(function($) {
             updateCarouselButtons($(this));
         });
     }).resize();
+
+    // Lightbox Modal Logic
+    var modal = $('#wp-youflix-modal');
+    var videoFrame = modal.find('iframe');
+    var closeModal = $('.wp-youflix-modal-close');
+
+    $('.wp-youflix-video-thumb').on('click', function(e) {
+        e.preventDefault();
+        var videoId = $(this).data('video-id');
+        var embedUrl = 'https://www.youtube.com/embed/' + videoId + '?autoplay=1&rel=0';
+
+        videoFrame.attr('src', embedUrl);
+        $('body').addClass('wp-youflix-modal-open');
+        modal.show();
+    });
+
+    function closePlayer() {
+        videoFrame.attr('src', '');
+        $('body').removeClass('wp-youflix-modal-open');
+        modal.hide();
+    }
+
+    closeModal.on('click', function() {
+        closePlayer();
+    });
+
+    modal.on('click', function(e) {
+        if ($(e.target).is(modal)) {
+            closePlayer();
+        }
+    });
+
+    $(document).on('keydown', function(e) {
+        if (e.key === "Escape" && modal.is(':visible')) {
+            closePlayer();
+        }
+    });
 });

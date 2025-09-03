@@ -9,9 +9,18 @@ function wp_youflix_get_playlists() {
     $options = get_option('wp_youflix_settings');
     $api_key = $options['wp_youflix_api_key'] ?? '';
     $channel_id = $options['wp_youflix_channel_id'] ?? '';
+    $cache_time = $options['wp_youflix_cache_time'] ?? 3; // Default to 3 hours
+    $expiration = $cache_time * HOUR_IN_SECONDS;
 
     if (empty($api_key) || empty($channel_id)) {
         return new WP_Error('missing_credentials', __('API Key or Channel ID is missing.', 'wp-youflix'));
+    }
+
+    $transient_key = 'wp_youflix_playlists_' . $channel_id;
+    $cached_playlists = get_transient($transient_key);
+
+    if (false !== $cached_playlists) {
+        return $cached_playlists;
     }
 
     $url = sprintf(
@@ -33,6 +42,8 @@ function wp_youflix_get_playlists() {
         return new WP_Error('youtube_api_error', $data['error']['message']);
     }
 
+    set_transient($transient_key, $data['items'], $expiration);
+
     return $data['items'];
 }
 
@@ -44,9 +55,18 @@ function wp_youflix_get_playlists() {
 function wp_youflix_get_playlist_items($playlist_id) {
     $options = get_option('wp_youflix_settings');
     $api_key = $options['wp_youflix_api_key'] ?? '';
+    $cache_time = $options['wp_youflix_cache_time'] ?? 3; // Default to 3 hours
+    $expiration = $cache_time * HOUR_IN_SECONDS;
 
     if (empty($api_key)) {
         return new WP_Error('missing_api_key', __('API Key is missing.', 'wp-youflix'));
+    }
+
+    $transient_key = 'wp_youflix_playlist_items_' . $playlist_id;
+    $cached_items = get_transient($transient_key);
+
+    if (false !== $cached_items) {
+        return $cached_items;
     }
 
     $url = sprintf(
@@ -67,6 +87,8 @@ function wp_youflix_get_playlist_items($playlist_id) {
     if (isset($data['error'])) {
         return new WP_Error('youtube_api_error', $data['error']['message']);
     }
+
+    set_transient($transient_key, $data['items'], $expiration);
 
     return $data['items'];
 }
@@ -95,10 +117,41 @@ add_action('wp_enqueue_scripts', 'wp_youflix_enqueue_scripts');
 /**
  * Register the shortcode.
  */
-function wp_youflix_shortcode() {
+function wp_youflix_shortcode($atts) {
+    $atts = shortcode_atts(
+        [
+            'playlists' => '',
+        ],
+        $atts,
+        'wp_youflix'
+    );
+
     ob_start();
 
-    $playlists = wp_youflix_get_playlists();
+    $all_playlists = wp_youflix_get_playlists();
+
+    if (is_wp_error($all_playlists)) {
+        echo esc_html($all_playlists->get_error_message());
+        return ob_get_clean();
+    }
+
+    $playlists_to_show = [];
+    if (!empty($atts['playlists'])) {
+        $playlist_ids = array_map('trim', explode(',', $atts['playlists']));
+        $playlist_map = [];
+        foreach ($all_playlists as $playlist) {
+            $playlist_map[$playlist['id']] = $playlist;
+        }
+        foreach ($playlist_ids as $id) {
+            if (isset($playlist_map[$id])) {
+                $playlists_to_show[] = $playlist_map[$id];
+            }
+        }
+    } else {
+        $playlists_to_show = $all_playlists;
+    }
+
+    $playlists = $playlists_to_show;
 
     if (is_wp_error($playlists)) {
         echo esc_html($playlists->get_error_message());
@@ -155,9 +208,9 @@ function wp_youflix_shortcode() {
                         $video_id = $video['snippet']['resourceId']['videoId'];
                     $thumbnail_url = $video['snippet']['thumbnails']['high']['url'];
                     ?>
-                    <div class="wp-youflix-video-thumb">
+                    <a href="#" class="wp-youflix-video-thumb" data-video-id="<?php echo esc_attr($video_id); ?>">
                         <img src="<?php echo esc_url($thumbnail_url); ?>" alt="<?php echo esc_attr($video['snippet']['title']); ?>">
-                    </div>
+                    </a>
                 <?php endforeach; ?>
                 </div>
                 <button class="wp-youflix-carousel-next">&gt;</button>
@@ -167,6 +220,17 @@ function wp_youflix_shortcode() {
     }
 
     echo '</div>'; // .wp-youflix-container
+
+    ?>
+    <div id="wp-youflix-modal" class="wp-youflix-modal">
+        <div class="wp-youflix-modal-content">
+            <span class="wp-youflix-modal-close">&times;</span>
+            <div class="wp-youflix-modal-video-wrap">
+                <iframe width="560" height="315" src="" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+            </div>
+        </div>
+    </div>
+    <?php
 
     return ob_get_clean();
 }
